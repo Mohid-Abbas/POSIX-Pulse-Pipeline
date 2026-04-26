@@ -3,7 +3,9 @@
 ## Project Overview
 This project implements a high-performance, parallel data processing pipeline on Linux. It is designed to ingest CSV datasets, process them concurrently using a pool of worker threads, aggregate the results, and generate structured reports. The system is built entirely using C/C++ POSIX system calls, bypassing high-level frameworks to demonstrate direct interaction with the operating system primitives.
 
-The current implementation uses the **Retail Transactions** dataset variant, aggregating total revenue and record counts grouped by product category.
+The pipeline is designed to be **highly generic**; it can ingest CSV datasets with any number of columns, automatically detecting and aggregating numeric values while safely ignoring headers and malformed records.
+
+The current implementation is optimized for the **Retail Transactions** variant but is flexible enough to handle IoT logs, financial data, or any other keyed tabular data.
 
 ### Key Operating System Concepts Demonstrated:
 - **Process Management**: Heavy use of `fork()`, `execvp()`, `waitpid()`, and `getpid()`/`getppid()`.
@@ -67,8 +69,19 @@ chmod +x run.sh
 - `-i <dir>` : Specify the input directory containing `.csv` files (Default: `data`).
 - `-o <dir>` : Specify the output directory for reports (Default: `output`).
 - `-n <num>` : Set the number of worker threads in the processor (Default: `4`).
+- `-q <num>` : Set the queue size (Q) for the bounded buffer (Default: `10`).
 - `-c`       : Perform a clean build (`make clean`) before compiling.
 - `-h`       : Show the help message.
+
+---
+
+## Generic CSV Support
+
+The system is engineered to handle varied CSV structures without code changes:
+- **Variable Columns**: The processor automatically sums all numeric columns found after the first column (the key).
+- **Header Detection**: It intelligently skips non-numeric header rows.
+- **Robustness**: Empty lines or malformed rows are skipped without interrupting the pipeline.
+- **Scaling**: Supports up to 5,000 unique keys/categories by default (configurable in `common.h`).
 
 ---
 
