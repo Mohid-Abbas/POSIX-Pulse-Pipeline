@@ -43,31 +43,45 @@ void process_chunk(char *chunk, size_t size) {
     (void)size;
     char *saveptr1, *saveptr2;
     char *line = strtok_r(chunk, "\n", &saveptr1);
+    
     while (line != NULL) {
         char *line_copy = strdup(line);
         char *category = strtok_r(line_copy, ",", &saveptr2);
-        char *revenue_str = strtok_r(NULL, ",", &saveptr2);
         
-        if (category && revenue_str) {
-            double revenue = atof(revenue_str);
+        if (category) {
+            double line_total = 0;
+            int has_values = 0;
+            char *value_str;
             
-            pthread_mutex_lock(&table_mutex);
-            int found = 0;
-            for (int i = 0; i < table_count; i++) {
-                if (strcmp(table[i].category, category) == 0) {
-                    table[i].total_revenue += revenue;
-                    table[i].count++;
-                    found = 1;
-                    break;
+            /* Generic: Aggregate all numeric columns after the first one */
+            while ((value_str = strtok_r(NULL, ",", &saveptr2)) != NULL) {
+                /* Basic check to see if it's a number (skip headers like 'Price') */
+                if ((value_str[0] >= '0' && value_str[0] <= '9') || value_str[0] == '-' || value_str[0] == '.') {
+                    line_total += atof(value_str);
+                    has_values = 1;
                 }
             }
-            if (!found && table_count < MAX_RECORDS) {
-                strncpy(table[table_count].category, category, MAX_CATEGORY_LEN);
-                table[table_count].total_revenue = revenue;
-                table[table_count].count = 1;
-                table_count++;
+            
+            /* Only aggregate if we actually found numeric values */
+            if (has_values) {
+                pthread_mutex_lock(&table_mutex);
+                int found = 0;
+                for (int i = 0; i < table_count; i++) {
+                    if (strcmp(table[i].category, category) == 0) {
+                        table[i].total_revenue += line_total;
+                        table[i].count++;
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found && table_count < MAX_RECORDS) {
+                    strncpy(table[table_count].category, category, MAX_CATEGORY_LEN);
+                    table[table_count].total_revenue = line_total;
+                    table[table_count].count = 1;
+                    table_count++;
+                }
+                pthread_mutex_unlock(&table_mutex);
             }
-            pthread_mutex_unlock(&table_mutex);
         }
         free(line_copy);
         line = strtok_r(NULL, "\n", &saveptr1);
