@@ -40,10 +40,13 @@ queue_item_t dequeue() {
 }
 
 void process_chunk(char *chunk, size_t size) {
-    char *line = strtok(chunk, "\n");
+    (void)size;
+    char *saveptr1, *saveptr2;
+    char *line = strtok_r(chunk, "\n", &saveptr1);
     while (line != NULL) {
-        char *category = strtok(line, ",");
-        char *revenue_str = strtok(NULL, ",");
+        char *line_copy = strdup(line);
+        char *category = strtok_r(line_copy, ",", &saveptr2);
+        char *revenue_str = strtok_r(NULL, ",", &saveptr2);
         
         if (category && revenue_str) {
             double revenue = atof(revenue_str);
@@ -66,7 +69,8 @@ void process_chunk(char *chunk, size_t size) {
             }
             pthread_mutex_unlock(&table_mutex);
         }
-        line = strtok(NULL, "\n");
+        free(line_copy);
+        line = strtok_r(NULL, "\n", &saveptr1);
     }
 }
 
