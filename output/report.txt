@@ -2,7 +2,9 @@ Pulse Pipeline Final Report
 ===========================
 Category             | Revenue         | Count     
 ---------------------------------------------------
-Electronics          | 2350.50         | 3         
-Clothing             | 570.00          | 2         
-Groceries            | 401.00          | 3         
-Home                 | 650.00          | 2         
+Electronics          | 144000.57       | 880       
+Clothing             | 134798.81       | 818       
+Groceries            | 134297.32       | 819       
+Home                 | 138354.68       | 833       
+Automotive           | 140118.37       | 846       
+Garden               | 132474.18       | 814       
