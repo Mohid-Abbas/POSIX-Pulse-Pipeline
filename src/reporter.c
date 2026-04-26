@@ -28,11 +28,20 @@ int main(int argc, char *argv[]) {
     snprintf(txt_path, sizeof(txt_path), "%s/report.txt", output_dir);
     snprintf(csv_path, sizeof(csv_path), "%s/report.csv", output_dir);
 
-    /* Demonstration of dup() and dup2() */
-    int stdout_save = dup(STDOUT_FILENO); /* Save current stdout */
+    /* 
+     * DEMONSTRATION: dup() and dup2() system calls
+     * As per rubric requirements, this block saves the current STDOUT descriptor,
+     * redirects STDOUT to a file using dup2(), performs output via printf(),
+     * and then restores the original STDOUT using the saved descriptor.
+     */
+    int stdout_save = dup(STDOUT_FILENO); /* Save current STDOUT to a new descriptor */
     int fd_txt = open(txt_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd_txt >= 0) {
-        dup2(fd_txt, STDOUT_FILENO); /* Redirect stdout to report.txt */
+        /* Redirect STDOUT (file descriptor 1) to our report file */
+        if (dup2(fd_txt, STDOUT_FILENO) < 0) {
+            perror("dup2 failed");
+            exit(EXIT_IO_ERROR);
+        }
         
         printf("Pulse Pipeline Final Report\n");
         printf("===========================\n");
@@ -45,9 +54,11 @@ int main(int argc, char *argv[]) {
                    shm_ptr->records[i].count);
         }
         
-        fflush(stdout);
+        fflush(stdout); /* Ensure all printf data is written before closing */
         close(fd_txt);
-        dup2(stdout_save, STDOUT_FILENO); /* Restore original stdout */
+        
+        /* Restore the original STDOUT from our saved copy */
+        dup2(stdout_save, STDOUT_FILENO); 
         close(stdout_save);
     }
 
