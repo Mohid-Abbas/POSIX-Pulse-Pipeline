@@ -18,6 +18,9 @@ aggregation_record_t table[MAX_RECORDS];
 int table_count = 0;
 pthread_mutex_t table_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* Which CSV column (1-indexed) to use as the grouping key */
+int key_col = 1;
+
 void enqueue(void *data, size_t size, int is_eof) {
     sem_wait(&sem_empty);
     pthread_mutex_lock(&queue_mutex);
@@ -75,7 +78,7 @@ int is_numeric(const char *str) {
 
 void process_chunk(char *chunk, size_t size) {
     (void)size;
-    char *saveptr1, *saveptr2;
+    char *saveptr1;
     char *line = strtok_r(chunk, "\n", &saveptr1);
     
     while (line != NULL) {
@@ -86,47 +89,50 @@ void process_chunk(char *chunk, size_t size) {
         }
 
         char *line_copy = strdup(line);
-        char *category = strtok_r(line_copy, ",", &saveptr2);
+        char *saveptr2;
         
-        if (category) {
-            /* Strip trailing \r from category if present */
-            size_t clen = strlen(category);
-            if (clen > 0 && category[clen-1] == '\r') category[clen-1] = '\0';
+        /* Tokenize to find the key column and aggregate numeric columns */
+        char *token;
+        char *category = NULL;
+        int col = 0;
+        double line_total = 0;
+        int has_values = 0;
+        
+        token = strtok_r(line_copy, ",", &saveptr2);
+        while (token != NULL) {
+            col++;
+            if (col == key_col) {
+                /* Strip trailing \r */
+                size_t tlen = strlen(token);
+                if (tlen > 0 && token[tlen-1] == '\r') token[tlen-1] = '\0';
+                category = token;
+            } else if (is_numeric(token)) {
+                line_total += atof(token);
+                has_values = 1;
+            }
+            token = strtok_r(NULL, ",", &saveptr2);
+        }
             
-            double line_total = 0;
-            int has_values = 0;
-            char *value_str;
-            
-            /* Generic: Aggregate all numeric columns after the first one */
-            while ((value_str = strtok_r(NULL, ",", &saveptr2)) != NULL) {
-                /* Strict numeric check: only aggregate pure numbers */
-                if (is_numeric(value_str)) {
-                    line_total += atof(value_str);
-                    has_values = 1;
+        /* Only aggregate if we found a key and numeric values */
+        if (category && has_values) {
+            pthread_mutex_lock(&table_mutex);
+            int found = 0;
+            for (int i = 0; i < table_count; i++) {
+                if (strcmp(table[i].category, category) == 0) {
+                    table[i].total_revenue += line_total;
+                    table[i].count++;
+                    found = 1;
+                    break;
                 }
             }
-            
-            /* Only aggregate if we actually found numeric values */
-            if (has_values) {
-                pthread_mutex_lock(&table_mutex);
-                int found = 0;
-                for (int i = 0; i < table_count; i++) {
-                    if (strcmp(table[i].category, category) == 0) {
-                        table[i].total_revenue += line_total;
-                        table[i].count++;
-                        found = 1;
-                        break;
-                    }
-                }
-                if (!found && table_count < MAX_RECORDS) {
-                    strncpy(table[table_count].category, category, MAX_CATEGORY_LEN - 1);
-                    table[table_count].category[MAX_CATEGORY_LEN - 1] = '\0';
-                    table[table_count].total_revenue = line_total;
-                    table[table_count].count = 1;
-                    table_count++;
-                }
-                pthread_mutex_unlock(&table_mutex);
+            if (!found && table_count < MAX_RECORDS) {
+                strncpy(table[table_count].category, category, MAX_CATEGORY_LEN - 1);
+                table[table_count].category[MAX_CATEGORY_LEN - 1] = '\0';
+                table[table_count].total_revenue = line_total;
+                table[table_count].count = 1;
+                table_count++;
             }
+            pthread_mutex_unlock(&table_mutex);
         }
         free(line_copy);
         line = strtok_r(NULL, "\n", &saveptr1);
@@ -157,8 +163,8 @@ ssize_t read_all(int fd, void *buf, size_t count) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 5) {
-        fprintf(stderr, "Usage: %s <num_threads> <queue_size> <fifo_path> <shm_name>\n", argv[0]);
+    if (argc < 6) {
+        fprintf(stderr, "Usage: %s <num_threads> <queue_size> <fifo_path> <shm_name> <key_column>\n", argv[0]);
         return EXIT_BAD_ARGS;
     }
 
@@ -166,6 +172,8 @@ int main(int argc, char *argv[]) {
     queue_size = atoi(argv[2]);
     const char *fifo_path = argv[3];
     const char *shm_name = argv[4];
+    key_col = atoi(argv[5]);
+    if (key_col < 1) key_col = 1;
 
     /* Initialize Semaphores with user-defined queue size Q */
     sem_init(&sem_empty, 0, queue_size);
