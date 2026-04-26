@@ -5,6 +5,7 @@ INPUT_DIR="data"
 OUTPUT_DIR="output"
 THREADS=4
 QUEUE_SIZE=10
+KEY_COL=1
 CLEAN=0
 FIFO_PATH="/tmp/pulse_pipeline_fifo"
 SHM_NAME="/pulse_pipeline_shm"
@@ -13,11 +14,13 @@ SHM_NAME="/pulse_pipeline_shm"
 
 # Function 1: Display usage information
 usage() {
-    echo "Usage: $0 [-i input_dir] [-o output_dir] [-n num_threads] [-q queue_size] [-c] [-h]"
+    echo "Usage: $0 [-i input_dir] [-o output_dir] [-n num_threads] [-q queue_size] [-k key_column] [-c] [-h]"
     echo "  -i  Directory containing CSV files (default: data)"
     echo "  -o  Directory for reports (default: output)"
     echo "  -n  Number of worker threads (default: 4)"
     echo "  -q  Queue size (default: 10)"
+    echo "  -k  Key column number, 1-indexed (default: 1)"
+    echo "      Example: -k 2 groups by Country, -k 3 groups by League"
     echo "  -c  Clean build before running"
     echo "  -h  Display this help message"
     exit 1
@@ -51,12 +54,13 @@ build_and_validate() {
 # --- Main Script Logic ---
 
 # Parse options using getopts (Rubric Requirement)
-while getopts "i:o:n:q:ch" opt; do
+while getopts "i:o:n:q:k:ch" opt; do
     case ${opt} in
         i) INPUT_DIR=$OPTARG ;;
         o) OUTPUT_DIR=$OPTARG ;;
         n) THREADS=$OPTARG ;;
         q) QUEUE_SIZE=$OPTARG ;;
+        k) KEY_COL=$OPTARG ;;
         c) CLEAN=1 ;;
         h) usage ;;
         *) usage ;;
@@ -74,10 +78,10 @@ if [ ! -d "$INPUT_DIR" ] || [ -z "$(ls -A "$INPUT_DIR"/*.csv 2>/dev/null)" ]; th
 fi
 
 echo "Launching Pulse Pipeline..."
-echo "Input: $INPUT_DIR | Output: $OUTPUT_DIR | Threads: $THREADS | Queue: $QUEUE_SIZE"
+echo "Input: $INPUT_DIR | Output: $OUTPUT_DIR | Threads: $THREADS | Queue: $QUEUE_SIZE | Key Column: $KEY_COL"
 
 # Start dispatcher with all required arguments
-./dispatcher "$INPUT_DIR" "$OUTPUT_DIR" "$THREADS" "$QUEUE_SIZE" "$FIFO_PATH" "$SHM_NAME" &
+./dispatcher "$INPUT_DIR" "$OUTPUT_DIR" "$THREADS" "$QUEUE_SIZE" "$FIFO_PATH" "$SHM_NAME" "$KEY_COL" &
 DISPATCHER_PID=$!
 echo $DISPATCHER_PID > .pid
 
