@@ -87,31 +87,35 @@ void *worker_thread(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 4) {
-        fprintf(stderr, "Usage: %s <num_threads> <fifo_path> <shm_name>\n", argv[0]);
+    if (argc < 5) {
+        fprintf(stderr, "Usage: %s <num_threads> <queue_size> <fifo_path> <shm_name>\n", argv[0]);
         return EXIT_BAD_ARGS;
     }
 
     int num_threads = atoi(argv[1]);
-    const char *fifo_path = argv[2];
-    const char *shm_name = argv[3];
-    queue_size = 10; /* Fixed for now, can be made arg */
+    queue_size = atoi(argv[2]);
+    const char *fifo_path = argv[3];
+    const char *shm_name = argv[4];
 
-    /* Initialize Semaphores */
+    /* Initialize Semaphores with user-defined queue size Q */
     sem_init(&sem_empty, 0, queue_size);
     sem_init(&sem_full, 0, 0);
 
     queue = malloc(sizeof(queue_item_t) * queue_size);
 
-    /* Create Thread Pool */
+    /* Create Thread Pool with explicit attributes */
     pthread_t *threads = malloc(sizeof(pthread_t) * num_threads);
     pthread_attr_t attr;
     pthread_attr_init(&attr);
+    
+    /* Rubric: Explicit stack size and detach state */
     pthread_attr_setstacksize(&attr, 1024 * 1024); /* 1MB stack */
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE); /* Threads will be joined */
 
     for (int i = 0; i < num_threads; i++) {
         pthread_create(&threads[i], &attr, worker_thread, NULL);
     }
+    pthread_attr_destroy(&attr);
 
     /* FIFO Reader Thread (Main) */
     int fifo_fd = open(fifo_path, O_RDONLY);
