@@ -1,0 +1,5 @@
+Pulse Pipeline Final Report
+===========================
+Category             | Revenue         | Count     
+---------------------------------------------------
+Electronics          | 1200.50         | 1         
