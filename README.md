@@ -70,8 +70,21 @@ chmod +x run.sh
 - `-o <dir>` : Specify the output directory for reports (Default: `output`).
 - `-n <num>` : Set the number of worker threads in the processor (Default: `4`).
 - `-q <num>` : Set the queue size (Q) for the bounded buffer (Default: `10`).
+- `-k <num>` : Set which CSV column (1-indexed) to use as the grouping key (Default: `1`).
 - `-c`       : Perform a clean build (`make clean`) before compiling.
 - `-h`       : Show the help message.
+
+**Examples:**
+```bash
+# Group by the 1st column (default)
+./run.sh -c -n 4
+
+# Group by Country (2nd column) for a football dataset
+./run.sh -c -k 2 -n 4
+
+# Group by League (3rd column) with 8 threads and queue of 5
+./run.sh -c -k 3 -n 8 -q 5
+```
 
 ---
 
