@@ -93,3 +93,24 @@ Look inside these files to see trace messages, including the PID and PPID of eac
 ## Clean Shutdown and Robustness
 You can interrupt the pipeline at any time by pressing `Ctrl+C` (`SIGINT`). The Dispatcher intercepts this signal and propagates a `SIGTERM` to all child processes. 
 The components are programmed to catch this, cleanly release resources, unlink FIFOs, unmap Shared Memory, and exit without leaving zombie processes or memory leaks. You can verify this by running `ipcs -m` or checking `/tmp/` after an aborted run.
+
+---
+
+## Testing the Bounded Buffer (Queue)
+
+A critical requirement of this project is the **Bounded Buffer** synchronization. You can demonstrate that your synchronization logic (semaphores/mutexes) is working correctly by following these steps:
+
+### 1. Generate Large Test Data
+Run the provided data generator to create multiple CSV files with thousands of records:
+```bash
+./data/generate_data.sh
+```
+
+### 2. Run with a Restricted Queue
+Run the pipeline with a very small queue size (e.g., 5) and multiple worker threads. This ensures the queue stays full, forcing the "Reader" thread to wait for "Workers" to free up space:
+```bash
+./run.sh -q 5 -n 8
+```
+
+### 3. Verify Results
+Check the `logs/processor.log`. You will see that even with a tiny queue, the processor correctly handles thousands of records across multiple threads without crashing or losing data. This proves your **semaphores** are correctly managing the "backpressure" between the producer and consumers.
