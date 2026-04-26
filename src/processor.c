@@ -39,24 +39,68 @@ queue_item_t dequeue() {
     return item;
 }
 
+/*
+ * Checks whether a string is a pure numeric value (integer or float).
+ * Returns 1 if numeric, 0 otherwise.
+ * This prevents strings like "2009/2010" from being parsed as numbers.
+ */
+int is_numeric(const char *str) {
+    if (!str || *str == '\0') return 0;
+    
+    /* Skip leading whitespace */
+    while (*str == ' ' || *str == '\t') str++;
+    
+    /* Allow optional leading sign */
+    if (*str == '-' || *str == '+') str++;
+    
+    int has_digit = 0;
+    int has_dot = 0;
+    
+    while (*str) {
+        if (*str >= '0' && *str <= '9') {
+            has_digit = 1;
+        } else if (*str == '.' && !has_dot) {
+            has_dot = 1;
+        } else if (*str == '\r' || *str == ' ' || *str == '\t') {
+            /* Trailing whitespace or carriage return is OK */
+            break;
+        } else {
+            /* Any other character (like '/' in '2009/2010') means not numeric */
+            return 0;
+        }
+        str++;
+    }
+    return has_digit;
+}
+
 void process_chunk(char *chunk, size_t size) {
     (void)size;
     char *saveptr1, *saveptr2;
     char *line = strtok_r(chunk, "\n", &saveptr1);
     
     while (line != NULL) {
+        /* Skip empty lines and lines that start with carriage return only */
+        if (line[0] == '\0' || line[0] == '\r') {
+            line = strtok_r(NULL, "\n", &saveptr1);
+            continue;
+        }
+
         char *line_copy = strdup(line);
         char *category = strtok_r(line_copy, ",", &saveptr2);
         
         if (category) {
+            /* Strip trailing \r from category if present */
+            size_t clen = strlen(category);
+            if (clen > 0 && category[clen-1] == '\r') category[clen-1] = '\0';
+            
             double line_total = 0;
             int has_values = 0;
             char *value_str;
             
             /* Generic: Aggregate all numeric columns after the first one */
             while ((value_str = strtok_r(NULL, ",", &saveptr2)) != NULL) {
-                /* Basic check to see if it's a number (skip headers like 'Price') */
-                if ((value_str[0] >= '0' && value_str[0] <= '9') || value_str[0] == '-' || value_str[0] == '.') {
+                /* Strict numeric check: only aggregate pure numbers */
+                if (is_numeric(value_str)) {
                     line_total += atof(value_str);
                     has_values = 1;
                 }
@@ -75,7 +119,8 @@ void process_chunk(char *chunk, size_t size) {
                     }
                 }
                 if (!found && table_count < MAX_RECORDS) {
-                    strncpy(table[table_count].category, category, MAX_CATEGORY_LEN);
+                    strncpy(table[table_count].category, category, MAX_CATEGORY_LEN - 1);
+                    table[table_count].category[MAX_CATEGORY_LEN - 1] = '\0';
                     table[table_count].total_revenue = line_total;
                     table[table_count].count = 1;
                     table_count++;
@@ -98,6 +143,17 @@ void *worker_thread(void *arg) {
         free(item.data);
     }
     return NULL;
+}
+
+/* Read exactly 'count' bytes from fd, handling partial reads */
+ssize_t read_all(int fd, void *buf, size_t count) {
+    size_t total = 0;
+    while (total < count) {
+        ssize_t ret = read(fd, (char *)buf + total, count - total);
+        if (ret <= 0) return (total > 0) ? (ssize_t)total : ret;
+        total += ret;
+    }
+    return (ssize_t)total;
 }
 
 int main(int argc, char *argv[]) {
@@ -139,11 +195,16 @@ int main(int argc, char *argv[]) {
     }
 
     chunk_header_t header;
-    while (read(fifo_fd, &header, sizeof(header)) > 0) {
+    while (read_all(fifo_fd, &header, sizeof(header)) == (ssize_t)sizeof(header)) {
         if (header.is_eof) break;
         
         void *data = malloc(header.byte_count + 1);
-        read(fifo_fd, data, header.byte_count);
+        ssize_t got = read_all(fifo_fd, data, header.byte_count);
+        if (got < (ssize_t)header.byte_count) {
+            LOG_MSG("Warning: partial chunk read (%zd / %zu)", got, header.byte_count);
+            free(data);
+            break;
+        }
         ((char *)data)[header.byte_count] = '\0';
         
         enqueue(data, header.byte_count, 0);
@@ -159,6 +220,14 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
     }
+
+    /* Cleanup synchronization primitives */
+    sem_destroy(&sem_empty);
+    sem_destroy(&sem_full);
+    pthread_mutex_destroy(&queue_mutex);
+    pthread_mutex_destroy(&table_mutex);
+    free(queue);
+    free(threads);
 
     /* Serialize to Shared Memory */
     int shm_fd = shm_open(shm_name, O_RDWR, 0666);
