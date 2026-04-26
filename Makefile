@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -pthread -Isrc
+CFLAGS = -Wall -Wextra -pthread -Isrc -D_GNU_SOURCE
 LDFLAGS = -lrt -pthread
 
 TARGETS = dispatcher ingester processor reporter
