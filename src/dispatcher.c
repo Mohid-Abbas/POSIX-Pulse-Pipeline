@@ -36,8 +36,8 @@ void setup_logging(const char *name) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 7) {
-        fprintf(stderr, "Usage: %s <input_dir> <output_dir> <threads> <queue_size> <fifo_path> <shm_name>\n", argv[0]);
+    if (argc < 8) {
+        fprintf(stderr, "Usage: %s <input_dir> <output_dir> <threads> <queue_size> <fifo_path> <shm_name> <key_column>\n", argv[0]);
         return EXIT_BAD_ARGS;
     }
 
@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
     const char *queue_size = argv[4];
     const char *fifo_path = argv[5];
     const char *shm_name = argv[6];
+    const char *key_column = argv[7];
 
     /* Initialize Signal Handlers */
     struct sigaction sa;
@@ -99,7 +100,7 @@ int main(int argc, char *argv[]) {
     processor_pid = fork();
     if (processor_pid == 0) {
         setup_logging("processor");
-        char *args[] = {"./processor", (char *)threads, (char *)queue_size, (char *)fifo_path, (char *)shm_name, NULL};
+        char *args[] = {"./processor", (char *)threads, (char *)queue_size, (char *)fifo_path, (char *)shm_name, (char *)key_column, NULL};
         execvp(args[0], args);
         perror("exec processor");
         exit(EXIT_CHILD_FAILURE);
