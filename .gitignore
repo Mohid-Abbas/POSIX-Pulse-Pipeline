@@ -399,3 +399,21 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# --- POSIX-Pulse-Pipeline Specific ---
+# Compiled Executables
+dispatcher
+ingester
+processor
+reporter
+
+# Logs and Output Directories
+logs/
+output/
+
+# Process ID files
+*.pid
+.pid
+
+# Documentation
+DECLARATION.txt
