@@ -17,6 +17,8 @@ void signal_handler(int sig) {
         if (ingester_pid > 0) kill(ingester_pid, SIGTERM);
         if (processor_pid > 0) kill(processor_pid, SIGTERM);
         if (reporter_pid > 0) kill(reporter_pid, SIGTERM);
+    } else if (sig == SIGUSR1) {
+        LOG_MSG("Status: Reporter has finished report generation.");
     }
 }
 
@@ -53,6 +55,7 @@ int main(int argc, char *argv[]) {
     sigaction(SIGCHLD, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGUSR1, &sa, NULL);
 
     /* Create IPC Resources */
     if (mkfifo(fifo_path, 0666) < 0 && errno != EEXIST) {
