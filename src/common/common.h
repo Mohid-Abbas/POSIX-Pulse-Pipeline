@@ -33,7 +33,7 @@
 /* Data Limits */
 #define MAX_CATEGORY_LEN 64
 #define MAX_CHUNKS_SIZE (64 * 1024) /* 64 KB */
-#define MAX_RECORDS 1000
+#define MAX_RECORDS 5000
 
 /* Chunk Structure */
 typedef struct {
