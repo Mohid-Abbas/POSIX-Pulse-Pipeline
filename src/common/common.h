@@ -31,8 +31,8 @@
 #define FIFO_NAME "/tmp/pulse_pipeline_fifo"
 
 /* Data Limits */
-#define MAX_CATEGORY_LEN 64
-#define MAX_CHUNKS_SIZE (64 * 1024) /* 64 KB */
+#define MAX_SYMBOL_LEN 16
+#define MAX_CHUNKS_SIZE (64 * 1024)       // 64 KB 
 #define MAX_RECORDS 5000
 
 /* Chunk Structure */
@@ -43,17 +43,19 @@ typedef struct {
     int is_eof; /* 1 if this is the end of stream */
 } chunk_header_t;
 
-/* Aggregation Record (Retail Variant) */
+/* Aggregation Record (Financial Tick Variant) */
 typedef struct {
-    char category[MAX_CATEGORY_LEN];
-    double total_revenue;
-    int count;
-} aggregation_record_t;
+    char symbol[MAX_SYMBOL_LEN];
+    double total_value;
+    int total_volume;
+    double high;
+    double low;
+} StockData;
 
 /* Shared Memory Layout */
 typedef struct {
     int record_count;
-    aggregation_record_t records[MAX_RECORDS];
+    StockData records[MAX_RECORDS];
 } shm_layout_t;
 
 /* Logging Utility */
