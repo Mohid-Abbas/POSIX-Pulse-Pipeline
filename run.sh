@@ -36,7 +36,31 @@ cleanup() {
     fi
 }
 
-# Function 3: Validate environment and build
+# Function 3: Validate integer argument
+validate_positive_int() {
+    local val=$1
+    local name=$2
+    
+    # Check if empty
+    if [ -z "$val" ]; then
+        echo "Error: $name not specified."
+        exit 10
+    fi
+    
+    # Check if it's a positive integer using regex
+    if ! echo "$val" | grep -qE '^[0-9]+$'; then
+        echo "Error: $name must be a positive integer, got: $val"
+        exit 10
+    fi
+    
+    # Check if it's greater than 0
+    if [ "$val" -le 0 ]; then
+        echo "Error: $name must be greater than 0, got: $val"
+        exit 10
+    fi
+}
+
+# Function 4: Validate environment and build
 build_and_validate() {
     if [ "$CLEAN" -eq 1 ]; then
         make clean
@@ -69,11 +93,28 @@ done
 
 trap cleanup EXIT INT TERM
 
+# Validate numeric arguments BEFORE build
+validate_positive_int "$THREADS" "Number of threads (-n)"
+validate_positive_int "$QUEUE_SIZE" "Queue size (-q)"
+validate_positive_int "$KEY_COL" "Key column (-k)"
+
 build_and_validate
 
-# Verify input
-if [ ! -d "$INPUT_DIR" ] || [ -z "$(ls -A "$INPUT_DIR"/*.csv 2>/dev/null)" ]; then
-    echo "Error: Input directory '$INPUT_DIR' not found or contains no CSV files."
+# Verify input directory exists
+if [ ! -d "$INPUT_DIR" ]; then
+    echo "Error: Input directory '$INPUT_DIR' not found."
+    exit 10
+fi
+
+# Verify output directory exists
+if [ ! -d "$OUTPUT_DIR" ]; then
+    echo "Error: Output directory '$OUTPUT_DIR' not found or cannot create."
+    exit 10
+fi
+
+# Verify at least one CSV file exists
+if [ -z "$(ls -A "$INPUT_DIR"/*.csv 2>/dev/null)" ]; then
+    echo "Error: Input directory '$INPUT_DIR' contains no CSV files."
     exit 40
 fi
 
@@ -85,11 +126,17 @@ echo "Input: $INPUT_DIR | Output: $OUTPUT_DIR | Threads: $THREADS | Queue: $QUEU
 DISPATCHER_PID=$!
 echo $DISPATCHER_PID > .pid
 
-# Wait for dispatcher
+# Wait for dispatcher and capture exit status
 wait $DISPATCHER_PID
 STATUS=$?
 
-echo "Pipeline finished with status $STATUS"
+# Verify dispatcher exited successfully
+if [ $STATUS -ne 0 ]; then
+    echo "Pipeline failed with status $STATUS"
+    exit $STATUS
+fi
+
+echo "Pipeline finished successfully"
 
 # --- Rubric Requirement: Arithmetic expansion ---
 if [ -f "$OUTPUT_DIR/report.csv" ]; then
